@@ -1,0 +1,132 @@
+version: "3.9"
+
+# ─────────── Common health‑check (unchanged) ────────────────────────────────
+x-worker-health: &grpc-health
+  test: ["CMD-SHELL", "grpc_health_probe -addr=localhost:50051 || exit 1"]
+  interval: 5s
+  timeout: 3s
+  retries: 15
+  start_period: 3s
+
+# ─────────── Re‑usable worker template (keeps file small) ─────────────────────
+x-worker-base: &worker-base
+  build:
+    context: .
+    dockerfile: worker/Dockerfile
+    target: dev
+  healthcheck: *grpc-health
+  expose:
+    - "50051"
+  restart: on-failure          # restart when the process exits non‑zero
+  deploy:
+    restart_policy:
+      condition: on-failure
+      delay: 5s                # wait 5 s before respawn
+      max_attempts: 0          # 0 = unlimited retries
+      window: 30s
+  volumes:
+    - ./worker:/app/worker
+    - ./proto:/app/proto
+
+services:
+  ############### WORKERS ####################################################
+  worker1:
+    <<: *worker-base
+    container_name: worker1
+    environment:
+      - WORKER_ID=worker1
+      # Testing ideal network conditions
+      - CRASH_RATE=0
+      - MAX_DELAY=0
+      # HARD failures: container exits
+      #- CRASH_RATE=0.05
+      # up‑to‑2 s artificial latency
+      #- MAX_DELAY=3.5
+
+  worker2:
+    <<: *worker-base
+    container_name: worker2
+    environment:
+      - WORKER_ID=worker2
+      # Testing ideal network conditions
+      - CRASH_RATE=0
+      - MAX_DELAY=0
+      # HARD failures: container exits
+      #- CRASH_RATE=0.05
+      # up‑to‑2 s artificial latency
+      #- MAX_DELAY=3.5
+  worker3:
+    <<: *worker-base
+    container_name: worker3
+    environment:
+      - WORKER_ID=worker3
+      # Testing ideal network conditions
+      - CRASH_RATE=0
+      - MAX_DELAY=0
+      # HARD failures: container exits
+      #- CRASH_RATE=0.05
+      # up‑to‑2 s artificial latency
+      #- MAX_DELAY=3.5
+
+  ############### COORDINATOR ################################################
+  coordinator:
+    build:
+      context: .
+      dockerfile: coordinator/Dockerfile
+      target: dev
+    container_name: coordinator
+    ports:
+      - "8000:8000"
+    environment:
+      - WORKERS=worker1:50051,worker2:50051,worker3:50051
+      - WORKER_TIMEOUT=3
+    volumes:
+      - ./coordinator:/app/coordinator
+      - ./proto:/app/proto
+    depends_on:
+      worker1:
+        condition: service_healthy
+      worker2:
+        condition: service_healthy
+      worker3:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/status || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+
+  ############### MONITOR ####################################################
+  monitor:
+    build:
+      context: .
+      dockerfile: monitor/Dockerfile
+      target: dev
+    container_name: monitor
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./monitor:/app
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8501/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 3s
+
+  ############### TEST RUNNER (optional) #####################################
+  test:
+    build:
+      context: .
+      dockerfile: test/Dockerfile
+      target: prod
+    container_name: test_runner
+    depends_on:
+      coordinator:
+        condition: service_healthy
+      monitor:
+        condition: service_healthy

@@ -1,0 +1,25 @@
+syntax = "proto3";
+package inference;
+
+service InferenceService {
+  rpc Infer       (InferRequest)  returns (InferResponse);
+  rpc HealthCheck (HealthRequest) returns (HealthResponse);
+}
+
+message InferRequest {
+  repeated string request_ids  = 1;
+  repeated string input_texts  = 2;
+}
+
+message InferResponse {
+  repeated string request_ids   = 1;
+  repeated string output_texts  = 2;
+  string   worker_id            = 3;
+  bool     success              = 4;
+}
+
+message HealthRequest {}
+message HealthResponse {
+  bool   ok        = 1;
+  string worker_id = 2;
+}
