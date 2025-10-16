@@ -217,4 +217,4 @@ An illustration of the dashboard depicting all these aspects at once is shown be
 
 *Thanks for reviewing my submission!*
 
-yolo3
+yolo4
