@@ -1,6 +1,6 @@
 version: "3.9"
 
-# ─────────── Common health‑check (unchanged) ────────────────────────────────
+# ─────────── Common health‑check (unchanged) ────────────────────────────────ll
 x-worker-health: &grpc-health
   test: ["CMD-SHELL", "grpc_health_probe -addr=localhost:50051 || exit 1"]
   interval: 5s
